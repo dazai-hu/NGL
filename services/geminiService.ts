@@ -1,61 +1,42 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { MessageTheme } from "../types";
 
-/**
- * Safely retrieves the API key. 
- * In production bundles, process.env might not be available directly in the browser 
- * unless explicitly injected, so we check multiple locations.
- */
-const getApiKey = () => {
+export const generateNGLMessages = async (theme: MessageTheme, count: number = 5): Promise<string[]> => {
+  let apiKey = "";
   try {
     // @ts-ignore
-    return process.env.API_KEY || (window as any).API_KEY || '';
-  } catch {
-    return '';
+    apiKey = process.env.API_KEY || "";
+  } catch (e) {
+    console.warn("API Key injection failed.");
   }
-};
-
-export const generateNGLMessages = async (theme: MessageTheme, count: number = 5): Promise<string[]> => {
-  const apiKey = getApiKey();
   
-  if (!apiKey) {
-    console.warn("Gemini API Key not found. Ensure API_KEY is set in environment variables.");
-    return ["Configuration error: API Key missing."];
+  if (!apiKey || apiKey === "$API_KEY" || apiKey.startsWith("$")) {
+    console.error("CONFIGURATION ERROR: Gemini API Key is missing. Add API_KEY to your environment variables.");
+    return ["System Error: API Configuration Incomplete"];
   }
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const systemInstruction = `You are a creative Hinglish content creator focusing on anonymous messages for NGL.link. 
-Your goal is to write messages that are unique, human-like, and fit specific archetypes.
+  const systemInstruction = `You are an elite Hinglish copywriter specialized in NGL.link anonymous messaging.
+Objective: Generate highly engaging, human-like, and culturally relevant messages in Hinglish (Hindi + English).
 
-GENDER NEUTRALITY RULE:
-- NEVER use "bhai", "bro", "behen", "dude", "girl", "guy".
-- Use: "yaar", "dost", "partner", "someone", "koi".
+STRICT RULES:
+1. GENDER NEUTRALITY: Never use "bhai", "bro", "behen", "didi", "girl", "guy". Use neutral terms like "yaar", "dost", or just direct address.
+2. CASUAL STYLE: No formal grammar. Use all lowercase, creative spellings (e.g., 'kyu' instead of 'kyun'), and 1Relatable emoji.
+3. UNIQUE HOOKS: Avoid clichés. Each message must be a distinct conversation starter.
 
-VARIETY RULE:
-- These messages are for DIFFERENT people. They should not sound like a conversation thread.
-- Each must be an independent "hook" or "thought".
-- Vary sentence structure: some short, some slightly longer, some questions, some statements.
+Theme Archetypes:
+- Roast: Savage but playful.
+- Comedy: Relay relatable Desi struggles.
+- Gen-Z: High energy brainrot slang (delulu, solulu, etc).
+- Sarcasm: Sharp wit.
+- Mystery: Deep or intriguing vibes.
 
-Style: Mostly lowercase, casual Hinglish (Hindi in English script), 1-2 emojis max.
+OUTPUT: Return a JSON array of strings ONLY.`;
 
-Theme Guidelines:
-- Hinglish Roast: Playful trolling. "itna confidence kahan se laate ho? 😂"
-- Sweet Flirt: Low-key charm. "tumhari vibe kaafi alag h sabse ✨"
-- Hinglish Comedy: Relatable Desi humor. "nashte me kya khaya jo itne chill ho? 💀"
-- Pure Love: Wholesome. "hamesha khush raha karo yaar 🫂"
-- Dark Flirt: Edgy/Smooth. "tumhe dekh ke focus hi nahi hota 🚩"
-- Dry Sarcasm: Witty. "waah, kya logic h tumhara 💯"
-- Mysterious/Deep: Intriguing. "kuch toh baat h jo tum batate nahi ho 🌑"
-- Gen-Z Slang: Peak brainrot/current trends. "ye vibe toh ekdum rizzler level h fr fr 💀🔥"
-- Desi Motivation: Wholesome push. "keep going, tum sahi kar rahe ho everything 🚀"
-
-Return a JSON array of strings.`;
-
-  const prompt = `Theme: ${theme}. Generate ${count} DISTINCT, non-repetitive anonymous messages. 
-Ensure they are gender-neutral and sound like completely different people sent them. 
-No "bro/bhai/behen". Mix up the length and tone within the theme.`;
+  const prompt = `Generate ${count} messages for the theme: ${theme}. 
+Context: Hinglish casual style, lowercase, gender neutral. 
+Ensure they sound like real people from Mumbai/Delhi/Bangalore sending an anonymous NGL.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -68,14 +49,14 @@ No "bro/bhai/behen". Mix up the length and tone within the theme.`;
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        temperature: 1.0, 
+        temperature: 0.9, 
       },
     });
 
     const text = response.text;
     return text ? JSON.parse(text) : [];
   } catch (error) {
-    console.error("Gemini Generation Error:", error);
-    return [];
+    console.error("Wave Engine Generation Error:", error);
+    return ["Generation cycle failed. Retrying..."];
   }
 };

@@ -4,14 +4,19 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// The 'dist' directory is created during the 'npm run build' step
 const distPath = path.join(__dirname, 'dist');
+console.log(`Starting server... serving static files from: ${distPath}`);
 
 app.use(express.static(distPath));
 
-// Handle Single Page Application routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  const indexPath = path.join(distPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error(`Error sending index.html: ${err.message}`);
+      res.status(500).send("Server Error: build output missing.");
+    }
+  });
 });
 
 app.listen(PORT, () => {
