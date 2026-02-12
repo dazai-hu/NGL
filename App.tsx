@@ -30,6 +30,25 @@ const MAX_USERS = 10;
 const STORAGE_KEY = 'ngl_wave_state_v4';
 const USERNAME_REGEX = /^[a-z0-9._]+$/;
 
+// Inline Worker Code to avoid Cross-Origin or Pathing issues on Render
+const WORKER_CODE = `
+  let timer = null;
+  self.onmessage = function(e) {
+    const { type, delay } = e.data;
+    if (type === 'START') {
+      if (timer) clearInterval(timer);
+      self.postMessage({ type: 'TICK' });
+      timer = setInterval(() => {
+        self.postMessage({ type: 'TICK' });
+      }, delay);
+    }
+    if (type === 'STOP') {
+      if (timer) clearInterval(timer);
+      timer = null;
+    }
+  };
+`;
+
 const App: React.FC = () => {
   const loadState = () => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -83,10 +102,11 @@ const App: React.FC = () => {
   }, [targetUsers, totalSent, theme, intH, intM, intS, isActive]);
 
   useEffect(() => {
-    // FIX: Using a direct string for the worker path is safer in non-bundled ESM environments
-    // This avoids the 'Failed to construct URL' error on Render/Production
     try {
-      workerRef.current = new Worker('worker.js');
+      // Create a Blob from the worker code string for 100% path reliability
+      const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(blob);
+      workerRef.current = new Worker(workerUrl);
       
       workerRef.current.onmessage = (e) => {
         if (e.data.type === 'TICK' && stateRef.current.isActive) {
@@ -98,18 +118,20 @@ const App: React.FC = () => {
         const delay = ((intH * 3600) + (intM * 60) + intS) * 1000;
         workerRef.current.postMessage({ type: 'START', delay });
       }
+
+      return () => {
+        workerRef.current?.terminate();
+        URL.revokeObjectURL(workerUrl);
+      };
     } catch (err) {
       console.error("Worker initialization failed:", err);
     }
-
-    return () => workerRef.current?.terminate();
   }, []);
 
   const replenishQueue = async (forceCount?: number) => {
     if (stateRef.current.isGenerating) return;
     setIsGenerating(true);
     try {
-      // Fetch high variety batch (20 messages)
       const newBatch = await generateNGLMessages(stateRef.current.theme, forceCount || 20);
       queueRef.current = [...queueRef.current, ...newBatch];
     } catch (e) {
@@ -123,11 +145,9 @@ const App: React.FC = () => {
     const { targetUsers } = stateRef.current;
     if (targetUsers.length === 0) return;
 
-    // Pick next user in rotation
     const currentTarget = targetUsers[userPointerRef.current % targetUsers.length];
     userPointerRef.current++;
 
-    // Ensure we always have fresh messages in the hopper
     if (queueRef.current.length < 5) {
       replenishQueue();
     }
@@ -203,7 +223,7 @@ const App: React.FC = () => {
     }
     setIsActive(true);
     if (queueRef.current.length === 0) {
-      await replenishQueue(25); // Large initial batch for variety
+      await replenishQueue(25);
     }
     workerRef.current?.postMessage({ type: 'START', delay });
   };
@@ -225,7 +245,6 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-20 pt-10 px-4 bg-[#f9fafb]">
       <div className="max-w-xl mx-auto space-y-8">
         
-        {/* Header Section */}
         <div className="text-center space-y-2">
           <h1 className="text-5xl font-black text-gray-900 tracking-tighter">NGL Wave</h1>
           <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -236,7 +255,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Dashboard */}
         <div className="premium-card rounded-[32px] p-6 flex items-center justify-between shadow-sm border-none ring-1 ring-gray-100">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-inner">
@@ -257,11 +275,8 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Configuration Card */}
         <div className="premium-card rounded-[40px] p-8 md:p-10 space-y-8 border-none ring-1 ring-gray-100 shadow-xl">
           <div className="space-y-6">
-            
-            {/* Input & Target List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center px-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -363,7 +378,6 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        {/* Logs Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-4">
             <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.2em] flex items-center gap-2">

@@ -2,8 +2,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { MessageTheme } from "../types";
 
+/**
+ * Safely retrieves the API key. 
+ * In production bundles, process.env might not be available directly in the browser 
+ * unless explicitly injected, so we check multiple locations.
+ */
+const getApiKey = () => {
+  try {
+    // @ts-ignore
+    return process.env.API_KEY || (window as any).API_KEY || '';
+  } catch {
+    return '';
+  }
+};
+
 export const generateNGLMessages = async (theme: MessageTheme, count: number = 5): Promise<string[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    console.warn("Gemini API Key not found. Ensure API_KEY is set in environment variables.");
+    return ["Configuration error: API Key missing."];
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const systemInstruction = `You are a creative Hinglish content creator focusing on anonymous messages for NGL.link. 
 Your goal is to write messages that are unique, human-like, and fit specific archetypes.
@@ -47,14 +68,14 @@ No "bro/bhai/behen". Mix up the length and tone within the theme.`;
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        temperature: 1.0, // Maximum randomness for variety
+        temperature: 1.0, 
       },
     });
 
     const text = response.text;
     return text ? JSON.parse(text) : [];
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Generation Error:", error);
     return [];
   }
 };

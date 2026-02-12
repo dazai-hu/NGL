@@ -1,17 +1,17 @@
 
 {
   "name": "ngl-wave-premium",
-  "version": "1.0.0",
-  "description": "High-performance NGL automation engine",
-  "main": "server.js",
+  "version": "1.0.1",
+  "private": true,
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "mkdir -p dist && ./node_modules/.bin/esbuild index.tsx --bundle --outfile=dist/index.js --loader:.tsx=tsx --loader:.ts=ts --minify --platform=browser --external:react --external:react-dom --external:@google/genai --external:lucide-react && cp index.html dist/",
+    "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "esbuild": "^0.20.0"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   }
 }

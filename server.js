@@ -4,17 +4,16 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Set correct MIME types for ESM and Workers
-express.static.mime.define({'application/javascript': ['js', 'tsx', 'ts']});
+// The 'dist' directory is created during the 'npm run build' step
+const distPath = path.join(__dirname, 'dist');
 
-// Serve static files from the root directory
-app.use(express.static(__dirname));
+app.use(express.static(distPath));
 
-// Send index.html for all routes to handle potential client-side routing
+// Handle Single Page Application routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`NGL Wave Engine running on port ${PORT}`);
+  console.log(`NGL Wave Engine: Production mode active on port ${PORT}`);
 });
