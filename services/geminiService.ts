@@ -17,26 +17,26 @@ export const generateNGLMessages = async (theme: MessageTheme, count: number = 5
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const systemInstruction = `You are an elite Hinglish copywriter specialized in NGL.link anonymous messaging.
-Objective: Generate highly engaging, human-like, and culturally relevant messages in Hinglish (Hindi + English).
+  const systemInstruction = `You are a high-level creative Hinglish copywriter specializing in "Refined Anonymous Messaging" for NGL.link.
+Your objective: Generate messages that feel authentic, human, and impossible to ignore.
 
-STRICT RULES:
-1. GENDER NEUTRALITY: Never use "bhai", "bro", "behen", "didi", "girl", "guy". Use neutral terms like "yaar", "dost", or just direct address.
-2. CASUAL STYLE: No formal grammar. Use all lowercase, creative spellings (e.g., 'kyu' instead of 'kyun'), and 1Relatable emoji.
-3. UNIQUE HOOKS: Avoid clichés. Each message must be a distinct conversation starter.
+REFINEMENT RULES:
+1. GENDER NEUTRALITY: Use neutral Hinglish. No "bhai", "behen", "bro", "didi". Use "yaar", "someone", "dost", or directly state the thought.
+2. INTELLIGENT EMOJIS: Add 1-2 emojis that match the context perfectly. Do not spam them. Place them at the end or mid-sentence for natural flow.
+3. CASUAL VIBE: Use modern Hinglish (e.g., 'pata nahi', 'kuch toh', 'sahi hai'). Use lowercase for a more "genuinely anonymous" look.
+4. VARIETY: Each message must be a completely different thought. No repetitive patterns.
 
-Theme Archetypes:
-- Roast: Savage but playful.
-- Comedy: Relay relatable Desi struggles.
-- Gen-Z: High energy brainrot slang (delulu, solulu, etc).
-- Sarcasm: Sharp wit.
-- Mystery: Deep or intriguing vibes.
+Theme Contexts:
+- Roast: 🤡 Savage trolling but keeping it classy.
+- Flirty: 🫠 Charming, low-key, sweet.
+- Funny: 😂 Relatable Desi/Gen-Z observations.
+- Slang: 💀 Brainrot terms like 'delulu', 'cooked', 'vibing'.
+- Mystery: 🕵️‍♂️ Deep, intriguing, one-liners.
 
-OUTPUT: Return a JSON array of strings ONLY.`;
+OUTPUT: Return a JSON array of strings ONLY. Each string is a single message.`;
 
-  const prompt = `Generate ${count} messages for the theme: ${theme}. 
-Context: Hinglish casual style, lowercase, gender neutral. 
-Ensure they sound like real people from Mumbai/Delhi/Bangalore sending an anonymous NGL.`;
+  const prompt = `Generate ${count} refined, high-quality Hinglish messages for the archetype: ${theme}. 
+Ensure they include appropriate emojis and follow the casual lowercase rule.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -49,7 +49,7 @@ Ensure they sound like real people from Mumbai/Delhi/Bangalore sending an anonym
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        temperature: 0.9, 
+        temperature: 1.0, 
       },
     });
 
@@ -57,6 +57,6 @@ Ensure they sound like real people from Mumbai/Delhi/Bangalore sending an anonym
     return text ? JSON.parse(text) : [];
   } catch (error) {
     console.error("Wave Engine Generation Error:", error);
-    return ["Generation cycle failed. Retrying..."];
+    return ["Generation cycle failed. Check system logs."];
   }
 };
