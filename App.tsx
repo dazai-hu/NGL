@@ -83,25 +83,34 @@ const App: React.FC = () => {
   }, [targetUsers, totalSent, theme, intH, intM, intS, isActive]);
 
   useEffect(() => {
-    workerRef.current = new Worker(new URL('./worker.js', import.meta.url));
-    workerRef.current.onmessage = (e) => {
-      if (e.data.type === 'TICK' && stateRef.current.isActive) {
-        processNextMessage();
+    // FIX: Using a direct string for the worker path is safer in non-bundled ESM environments
+    // This avoids the 'Failed to construct URL' error on Render/Production
+    try {
+      workerRef.current = new Worker('worker.js');
+      
+      workerRef.current.onmessage = (e) => {
+        if (e.data.type === 'TICK' && stateRef.current.isActive) {
+          processNextMessage();
+        }
+      };
+
+      if (initialState?.isActive) {
+        const delay = ((intH * 3600) + (intM * 60) + intS) * 1000;
+        workerRef.current.postMessage({ type: 'START', delay });
       }
-    };
-    if (initialState?.isActive) {
-      const delay = ((intH * 3600) + (intM * 60) + intS) * 1000;
-      workerRef.current.postMessage({ type: 'START', delay });
+    } catch (err) {
+      console.error("Worker initialization failed:", err);
     }
+
     return () => workerRef.current?.terminate();
   }, []);
 
-  const replenishQueue = async () => {
+  const replenishQueue = async (forceCount?: number) => {
     if (stateRef.current.isGenerating) return;
     setIsGenerating(true);
     try {
-      // Fetch a larger batch to ensure variety
-      const newBatch = await generateNGLMessages(stateRef.current.theme, 15);
+      // Fetch high variety batch (20 messages)
+      const newBatch = await generateNGLMessages(stateRef.current.theme, forceCount || 20);
       queueRef.current = [...queueRef.current, ...newBatch];
     } catch (e) {
       console.error("Queue replenish failed", e);
@@ -114,17 +123,25 @@ const App: React.FC = () => {
     const { targetUsers } = stateRef.current;
     if (targetUsers.length === 0) return;
 
+    // Pick next user in rotation
     const currentTarget = targetUsers[userPointerRef.current % targetUsers.length];
     userPointerRef.current++;
 
-    if (queueRef.current.length < 5) replenishQueue();
+    // Ensure we always have fresh messages in the hopper
+    if (queueRef.current.length < 5) {
+      replenishQueue();
+    }
 
     if (queueRef.current.length > 0) {
       const text = queueRef.current.shift()!;
       const msgId = Math.random().toString(36).substr(2, 9);
       
       const newMsg: GeneratedMessage = {
-        id: msgId, text, targetUser: currentTarget, status: 'sending', timestamp: new Date()
+        id: msgId, 
+        text, 
+        targetUser: currentTarget, 
+        status: 'sending', 
+        timestamp: new Date()
       };
       
       setMessages(prev => [newMsg, ...prev].slice(0, 100));
@@ -185,7 +202,9 @@ const App: React.FC = () => {
       return;
     }
     setIsActive(true);
-    if (queueRef.current.length === 0) await replenishQueue();
+    if (queueRef.current.length === 0) {
+      await replenishQueue(25); // Large initial batch for variety
+    }
     workerRef.current?.postMessage({ type: 'START', delay });
   };
 
@@ -195,7 +214,7 @@ const App: React.FC = () => {
   };
 
   const resetAll = () => {
-    if (confirm("Reset system state?")) {
+    if (confirm("Reset system state? This wipes all logs and targets.")) {
       workerRef.current?.postMessage({ type: 'STOP' });
       localStorage.removeItem(STORAGE_KEY);
       window.location.reload();
@@ -206,16 +225,18 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-20 pt-10 px-4 bg-[#f9fafb]">
       <div className="max-w-xl mx-auto space-y-8">
         
+        {/* Header Section */}
         <div className="text-center space-y-2">
           <h1 className="text-5xl font-black text-gray-900 tracking-tighter">NGL Wave</h1>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <span className="text-gray-400 text-sm font-medium">Hinglish Intelligence</span>
+            <span className="text-gray-400 text-sm font-medium">Multi-Target Intelligence</span>
             <span className="inline-flex items-center gap-1 text-[9px] bg-gray-900 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-              <Cpu className="w-2.5 h-2.5" /> Background Engine
+              <Cpu className="w-2.5 h-2.5" /> Engine v4.0 (Live)
             </span>
           </div>
         </div>
 
+        {/* Status Dashboard */}
         <div className="premium-card rounded-[32px] p-6 flex items-center justify-between shadow-sm border-none ring-1 ring-gray-100">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-inner">
@@ -236,9 +257,11 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Configuration Card */}
         <div className="premium-card rounded-[40px] p-8 md:p-10 space-y-8 border-none ring-1 ring-gray-100 shadow-xl">
           <div className="space-y-6">
             
+            {/* Input & Target List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center px-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -278,7 +301,7 @@ const App: React.FC = () => {
               <div className="flex flex-wrap gap-2 min-h-[40px]">
                 {targetUsers.length === 0 ? (
                   <p className="text-[11px] text-gray-300 italic px-1 flex items-center gap-2">
-                    <Info className="w-3 h-3" /> Add valid usernames (a-z, 0-9, ., _)
+                    <Info className="w-3 h-3" /> Targets auto-saved to device memory
                   </p>
                 ) : (
                   targetUsers.map(user => (
@@ -336,17 +359,18 @@ const App: React.FC = () => {
               isActive ? 'bg-red-50 text-red-500 hover:bg-red-100 ring-1 ring-red-200' : 'bg-gray-900 text-white hover:bg-black ring-1 ring-gray-800'
             }`}
           >
-            {isActive ? <><Square className="w-5 h-5 fill-current" /> STOP WAVE</> : <><Play className="w-5 h-5 fill-current" /> LAUNCH WAVE</>}
+            {isActive ? <><Square className="w-5 h-5 fill-current" /> STOP MISSION</> : <><Play className="w-5 h-5 fill-current" /> INITIATE WAVE</>}
           </button>
         </div>
 
+        {/* Logs Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-4">
             <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.2em] flex items-center gap-2">
-              <MessageSquare className="w-3 h-3" /> Transmission Logs
+              <MessageSquare className="w-3 h-3" /> Mission Transcript
             </h3>
             <button onClick={resetAll} className="text-[10px] font-bold text-gray-300 hover:text-red-500 uppercase tracking-widest flex items-center gap-1 transition-colors">
-              <Trash2 className="w-3 h-3" /> Wipe Data
+              <Trash2 className="w-3 h-3" /> Wipe History
             </button>
           </div>
 
@@ -354,7 +378,7 @@ const App: React.FC = () => {
             {messages.length === 0 ? (
               <div className="premium-card rounded-[32px] p-20 flex flex-col items-center justify-center text-center space-y-4 opacity-40">
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center"><Send className="w-6 h-6 text-gray-200" /></div>
-                <p className="text-[11px] font-bold text-gray-300 uppercase tracking-widest">Awaiting First Signal</p>
+                <p className="text-[11px] font-bold text-gray-300 uppercase tracking-widest">Awaiting First Transmission</p>
               </div>
             ) : (
               messages.map((msg) => (
@@ -363,7 +387,7 @@ const App: React.FC = () => {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-gray-900 uppercase tracking-wider bg-gray-100 px-2 py-1 rounded-lg">@{msg.targetUser}</span>
-                        <span className="text-[9px] font-bold text-gray-300 uppercase">{msg.timestamp.toLocaleTimeString()}</span>
+                        <span className="text-[9px] font-bold text-gray-300 uppercase tracking-tighter">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                       </div>
                       <p className="text-[16px] font-bold text-gray-800 leading-snug">{msg.text}</p>
                     </div>
@@ -372,9 +396,9 @@ const App: React.FC = () => {
                     </button>
                   </div>
                   <div className="flex items-center gap-4 border-t border-gray-50 pt-3">
-                    {msg.status === 'sent' && <span className="flex items-center gap-1 text-[9px] font-black text-green-500 uppercase"><CheckCircle2 className="w-3 h-3 animate-check" /> Success</span>}
-                    {msg.status === 'sending' && <span className="flex items-center gap-1 text-[9px] font-black text-blue-500 uppercase animate-pulse">Sending...</span>}
-                    {msg.status === 'failed' && <span className="flex items-center gap-1 text-[9px] font-black text-red-400 uppercase"><AlertCircle className="w-3 h-3" /> Error: {msg.error}</span>}
+                    {msg.status === 'sent' && <span className="flex items-center gap-1 text-[9px] font-black text-green-500 uppercase"><CheckCircle2 className="w-3 h-3 animate-check" /> Dispatched</span>}
+                    {msg.status === 'sending' && <span className="flex items-center gap-1 text-[9px] font-black text-blue-500 uppercase animate-pulse">Processing...</span>}
+                    {msg.status === 'failed' && <span className="flex items-center gap-1 text-[9px] font-black text-red-400 uppercase"><AlertCircle className="w-3 h-3" /> Network Error</span>}
                   </div>
                 </div>
               ))
@@ -384,8 +408,8 @@ const App: React.FC = () => {
 
         <div className="text-center pt-10 pb-10">
           <p className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.2em] max-w-xs mx-auto leading-relaxed">
-            Non-Gendered Hinglish Protocol <br/>
-            High-Variety Individual Targeting
+            Multi-Threaded Background Engine <br/>
+            Hinglish Context Protocol Enabled
           </p>
         </div>
       </div>

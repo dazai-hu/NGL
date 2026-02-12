@@ -4,6 +4,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Set correct MIME types for ESM and Workers
+express.static.mime.define({'application/javascript': ['js', 'tsx', 'ts']});
+
 // Serve static files from the root directory
 app.use(express.static(__dirname));
 
